@@ -1,6 +1,10 @@
 package com.sbn.italianref;
 
 
+import org.apache.lucene.document.Document;
+
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -16,7 +20,11 @@ public class App {
         ResourcesHandler rh = new ResourcesHandler();
         Path streamPath = rh.getDirFromResources(STREAM_RESOURCE);
         Path luceneIndexPath = Paths.get(LUCENE_INDEX);
+
+        LuceneWrapper.luceneIndexPath = luceneIndexPath;
         TweetsWrapper tw = new TweetsWrapper(streamPath, TWEETS_LIMIT);
-        tw.indexTweetsToLucene(luceneIndexPath);
+        if(Files.notExists(luceneIndexPath)) {
+            tw.indexTweetsToLucene();
+        }
     }
 }
