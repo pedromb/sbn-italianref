@@ -9,8 +9,8 @@ public class App {
 
     private static String STREAM_RESOURCE = "stream";
     private static String USERS_TO_FILTER_RESOURCE = "users.csv";
-    private static String LUCENE_INDEX = "teste/";
-    private static int TWEETS_LIMIT = 10;
+    private static String LUCENE_INDEX = "lucene_index/";
+    private static int TWEETS_LIMIT = 0;
 
     public static void main(String[] args) throws Exception {
         ResourcesHandler rh = new ResourcesHandler();
