@@ -29,11 +29,11 @@ public class TweetsWrapper {
         this.limitTweets = limitTweets;
     }
 
-    public void indexTweetsToLucene(Path luceneIndexPath) {
-        this.processTweets(luceneIndexPath);
+    public void indexTweetsToLucene() {
+        this.processTweets();
     }
 
-    private void processTweets(Path luceneIndexPath) {
+    private void processTweets() {
         try {
             int tweetsProcessed = 0;
             List<File> files = Files.walk(this.streamPath)
@@ -48,7 +48,7 @@ public class TweetsWrapper {
             Instant start = Instant.now();
             for (File file : files) {
                 Stream<JsonObject> tweets = this.readFile(file);
-                int numTweetsIndexed = LuceneWrapper.indexTweets(luceneIndexPath, tweets);
+                int numTweetsIndexed = LuceneWrapper.indexTweets(tweets);
                 Instant end = Instant.now();
                 long duration = Duration.between(start, end).getSeconds();
                 filesProcessed += 1;
