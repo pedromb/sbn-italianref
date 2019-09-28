@@ -1,14 +1,19 @@
 package com.sbn.italianref;
 
 import com.google.gson.*;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.IndexReader;
+import twitter4j.User;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +38,56 @@ public class TweetsWrapper {
         this.processTweets();
     }
 
+    public List<TweetModel> queryTweets(List<String> field, String query) throws IOException {
+        Map <Integer, Document> tweets = LuceneWrapper.searchIndex(field, query);
+        IndexReader ir = LuceneWrapper.getIndexReader();
+        List<TweetModel> tweetsModel = new ArrayList<TweetModel>();
+        for(int tweetId: tweets.keySet()) {
+            TweetModel tweetModel = new TweetModel();
+            tweetModel.setUser(tweets.get(tweetId).get("user"));
+            tweetModel.setUserCreatedTweet(tweets.get(tweetId).get("user_created_tweet"));
+            long createdAtTimestamp = Long.parseLong(tweets.get(tweetId).get("created_at"));
+            tweetModel.setCreatedAtTimestamp(createdAtTimestamp);
+            LocalDateTime createdAt = new Timestamp(createdAtTimestamp).toLocalDateTime();
+            tweetModel.setCreatedAt(createdAt);
+            tweetModel.setText(tweets.get(tweetId).get("text"));
+            tweetModel.setDocId(tweetId);
+            tweetModel.setUserId(tweets.get(tweetId).get("user_id"));
+            tweetModel.setTermsVector(LuceneWrapper.getTermVector(ir, tweetId, "text"));
+            tweetsModel.add(tweetModel);
+        }
+        return tweetsModel;
+    }
+
+    public Map<String, Long> getTermsFrequency(String field, String query, int topN) throws IOException {
+        Map<String, Long> termsFrequency = LuceneWrapper.getTermsFrequency(field, query);
+        Map<String, Long> termsFrequencyLimited = termsFrequency
+                .entrySet()
+                .stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .limit(topN)
+                .collect(Collectors.toMap(x->x.getKey(), x->x.getValue()));
+        return termsFrequencyLimited;
+    }
+
+    public Map<String, Long> getTermsFrequencyByDocIds(int [] docIds) throws IOException {
+        IndexReader ir = LuceneWrapper.getIndexReader();
+        return LuceneWrapper.getTermsFrequencyByDocIds(ir, docIds);
+    }
+
+    public static List<TweetModel> addSupportToTweetModel(List<TweetModel> tweets,  HashMap<String, String> users) {
+
+        for(TweetModel tweet : tweets) {
+            String userSupport = users.containsKey(tweet.getUser()) ? users.get(tweet.getUser()) : "none";
+            tweet.setUserSupport(userSupport);
+            String userCreatedTweetSupport = users.containsKey(tweet.getUserCreatedTweet()) ? users.get(tweet.getUserCreatedTweet()) : "none";
+            tweet.setUserCreatedTweetSupport(userCreatedTweetSupport);
+            String actualSupport = tweet.getUserSupport().equals("none") ? tweet.getUserCreatedTweetSupport() : tweet.getUserSupport();
+            tweet.setActualSupport(actualSupport);
+        }
+        return tweets;
+    }
+
     private void processTweets() {
         try {
             int tweetsProcessed = 0;
@@ -43,7 +98,7 @@ public class TweetsWrapper {
                     .collect(Collectors.toList());
             int totalNumOfFiles = files.size();
             int filesProcessed = 0;
-            String oldMessage = "Processing files: 0.00% | Time Elapsed; 0m0s | Time Remaining: tbd";
+            String oldMessage = "Processing files: 0.00% | Time Elapsed: 0m0s | Time Remaining: tbd";
             System.out.print(oldMessage);
             Instant start = Instant.now();
             for (File file : files) {
@@ -56,7 +111,7 @@ public class TweetsWrapper {
                 if (this.limitTweets != 0 && numTweetsIndexed > this.limitTweets) break;
             }
         } catch (Exception e) {
-            System.err.println(e);
+            e.printStackTrace();
         }
     }
 
@@ -66,7 +121,9 @@ public class TweetsWrapper {
             GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(file));
             BufferedReader br = new BufferedReader(new InputStreamReader(gzip));
             Stream<String> fileLines = br.lines();
-            return fileLines.map(this::getRawJson);
+            return fileLines
+                    .map(this::getRawJson)
+                    .map(this::subsetRawJson);
         } catch (Exception e) {
             System.err.println("Error: File reading file: " + e.getMessage());
             System.exit(0);
@@ -79,12 +136,54 @@ public class TweetsWrapper {
         m.reset(line);
         if (m.find()) {
             Long time = Long.parseLong(m.group(1));
-            String lang = m.group(2);
             String rawJson= m.group(3);
             JsonObject jo = jp.parse(rawJson).getAsJsonObject();
+            SimpleDateFormat datetimeFormatter1 = new SimpleDateFormat("EEE MMM dd HH:mm:ss Z yyyy");
+            try {
+                Date lFromDate1 = datetimeFormatter1.parse(jo.get("created_at").getAsString());
+                jo.addProperty("timestamp", lFromDate1.getTime());
+            } catch (Exception e) {
+                jo.addProperty("timestamp", time);
+            }
             return jo;
         }
         return null;
+    }
+
+    private JsonObject subsetRawJson(JsonObject originalJson) {
+        JsonObject newJson = new JsonObject();
+        JsonObject user = originalJson.getAsJsonObject("user");
+        String userId = user.get("id_str").getAsString();
+        String user_name = user.get("screen_name").getAsString();
+        String text = originalJson.get("text").getAsString();
+        String userCreatedTweet = user_name;
+        String originalTweetId = originalJson.get("id_str").getAsString();
+        boolean isRetweet = originalJson.has("retweeted_status");
+        if(isRetweet) {
+            text = originalJson
+                .getAsJsonObject("retweeted_status")
+                .get("text")
+                .getAsString();
+            userCreatedTweet = originalJson
+                .getAsJsonObject("retweeted_status")
+                .getAsJsonObject("user")
+                .get("screen_name")
+                .getAsString();
+            originalTweetId = originalJson
+                .getAsJsonObject("retweeted_status")
+                .get("id_str")
+                .getAsString();
+        }
+        newJson.addProperty("user", user_name);
+        newJson.addProperty("user_created_tweet", userCreatedTweet);
+        newJson.addProperty("text", text);
+        newJson.addProperty("created_at", originalJson.get("timestamp").getAsLong());
+        newJson.addProperty("id", originalJson.get("id_str").getAsString());
+        newJson.addProperty("original_tweet_id", originalTweetId);
+        newJson.addProperty("is_retweet", isRetweet);
+        newJson.addProperty("user_id", userId);
+
+        return newJson;
     }
 
     private String progressPct(String oldMessage, int num, int total, long durationSeconds) {
@@ -108,5 +207,6 @@ public class TweetsWrapper {
         System.out.print(newMessage);
         return newMessage;
     }
+
 
 }

@@ -1,3 +1,7 @@
+graphs/
+*.csv
+*.ipynb
+.ipynb*
 lucene_index/
 src/main/resources/
 target/
