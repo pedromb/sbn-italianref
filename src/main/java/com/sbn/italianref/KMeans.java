@@ -1,5 +1,6 @@
 package com.sbn.italianref;
 
+import com.sbn.italianref.Models.TermsTimeSeriesModel;
 import net.seninp.jmotif.sax.SAXException;
 import net.seninp.jmotif.sax.SAXProcessor;
 
@@ -10,7 +11,7 @@ public class KMeans {
 
 
     public static Map<String, List<String>> fitForSax(
-            Map<String, TermsTimeSeries> entries,
+            Map<String, TermsTimeSeriesModel> entries,
             int k,
             double[][] distanceMatrix,
             int alphabetSize,
@@ -18,7 +19,7 @@ public class KMeans {
     ) throws SAXException {
 
         int numIterationsToConverge = 0;
-        TermsTimeSeries firstTerm = (TermsTimeSeries) entries.values().toArray()[0];
+        TermsTimeSeriesModel firstTerm = (TermsTimeSeriesModel) entries.values().toArray()[0];
         int saxStringSize = firstTerm.getSax().length();
         SAXProcessor saxProcessor = new SAXProcessor();
         List<String> centroids = initCentroids(k, alphabetSize, saxStringSize, entries, distanceMatrix, saxProcessor);
@@ -35,13 +36,13 @@ public class KMeans {
                 break;
             }
         }
-        System.out.println("KMeans took "+numIterationsToConverge+" iterations to converge\n");
+        System.out.print("KMeans took "+numIterationsToConverge+" iterations to converge...");
         return clusters;
     }
 
 
     public static double saxDistance(
-            TermsTimeSeries a, String b,
+            TermsTimeSeriesModel a, String b,
             double[][] distanceMatrix, SAXProcessor saxProcessor) throws SAXException {
 
         char[] aString = a.getSax().toCharArray();
@@ -56,7 +57,7 @@ public class KMeans {
             int k,
             int alphabetSize,
             int saxStringSize,
-            Map<String, TermsTimeSeries> entries,
+            Map<String, TermsTimeSeriesModel> entries,
             double[][] distanceMatrix,
             SAXProcessor saxProcessor
     ) throws SAXException {
@@ -108,7 +109,7 @@ public class KMeans {
     }
 
     private static List<String> updateCentroids(
-            Map<String, TermsTimeSeries> entries,
+            Map<String, TermsTimeSeriesModel> entries,
             HashMap<String, List<String>> clusters
     ) {
         List<String> newCentroids = new ArrayList<String>();
@@ -145,14 +146,14 @@ public class KMeans {
     }
 
     private static HashMap<String, List<String>> calculateClusters(
-            Map<String, TermsTimeSeries> entries,
+            Map<String, TermsTimeSeriesModel> entries,
             double[][] distanceMatrix,
             SAXProcessor saxProcessor,
             List<String> centroids
     ) throws SAXException {
         HashMap<String, List<String>> newClusters = new HashMap<String, List<String>>();
         for (String term : entries.keySet()) {
-            TermsTimeSeries a = entries.get(term);
+            TermsTimeSeriesModel a = entries.get(term);
             double min = Double.POSITIVE_INFINITY;
             String minCentroid = "";
             for (String centroid : centroids) {
@@ -175,14 +176,14 @@ public class KMeans {
     }
 
     private static Map<String, List<Double>> getClustersWithAvgDistances(
-            Map<String, TermsTimeSeries> entries,
+            Map<String, TermsTimeSeriesModel> entries,
             double[][] distanceMatrix,
             SAXProcessor saxProcessor,
             List<String> centroids
     ) throws SAXException {
         HashMap<String, List<Double>> newClusters = new HashMap<String, List<Double>>();
         for (String term : entries.keySet()) {
-            TermsTimeSeries a = entries.get(term);
+            TermsTimeSeriesModel a = entries.get(term);
             double min = Double.POSITIVE_INFINITY;
             String minCentroid = "";
             for (String centroid : centroids) {

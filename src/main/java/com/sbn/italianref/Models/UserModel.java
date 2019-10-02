@@ -1,28 +1,37 @@
-package com.sbn.italianref;
+package com.sbn.italianref.Models;
 
 public class UserModel {
     String userName;
     String support;
     String userId;
-    double hubnessAuthority;
+    double hubScore;
+    double authorityScore;
     double supportScore;
+    double centralityScore;
 
-    double CentralityScore;
+
+    public double getAuthorityScore() {
+        return authorityScore;
+    }
+
+    public void setAuthorityScore(double authorityScore) {
+        this.authorityScore = authorityScore;
+    }
 
     public double getCentralityScore() {
-        return CentralityScore;
+        return centralityScore;
     }
 
     public void setCentralityScore(double centralityScore) {
-        CentralityScore = centralityScore;
+        this.centralityScore = centralityScore;
     }
 
-    public double getHubnessAuthority() {
-        return hubnessAuthority;
+    public double getHubScore() {
+        return hubScore;
     }
 
-    public void setHubnessAuthority(double hubnessAuthority) {
-        this.hubnessAuthority = hubnessAuthority;
+    public void setHubScore(double hubScore) {
+        this.hubScore = hubScore;
     }
 
     public String getUserName() {
@@ -46,14 +55,14 @@ public class UserModel {
     }
 
     public double getSupportScore() {
-        return supportScore;
+        return this.supportScore;
     }
 
     public void setSupportScore(double supportScore) {
         this.supportScore = supportScore;
-        if(supportScore > 0) {
+        if(supportScore > 10) {
             support = "Yes";
-        } else if(supportScore < 0) {
+        } else if(supportScore < -10) {
             support = "No";
         } else {
             support = "Neutral";

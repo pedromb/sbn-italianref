@@ -1,9 +1,9 @@
-package com.sbn.italianref;
+package com.sbn.italianref.Models;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 
-public class TermsTimeSeries {
+public class TermsTimeSeriesModel {
 
     int w;
     String term;

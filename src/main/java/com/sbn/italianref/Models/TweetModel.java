@@ -1,4 +1,4 @@
-package com.sbn.italianref;
+package com.sbn.italianref.Models;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;

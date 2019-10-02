@@ -1,5 +1,4 @@
-graphs/
-*.csv
+
 *.ipynb
 .ipynb*
 lucene_index/

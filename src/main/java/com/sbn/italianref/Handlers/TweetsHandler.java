@@ -1,9 +1,9 @@
-package com.sbn.italianref;
+package com.sbn.italianref.Handlers;
 
 import com.google.gson.*;
+import com.sbn.italianref.Models.TweetModel;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
-import twitter4j.User;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
-public class TweetsWrapper {
+public class TweetsHandler {
 
     private Path streamPath;
     private int limitTweets;
@@ -29,7 +29,7 @@ public class TweetsWrapper {
     private final static JsonParser jp = new JsonParser();
 
 
-    public TweetsWrapper(Path streamPath, int limitTweets) {
+    public TweetsHandler(Path streamPath, int limitTweets) {
         this.streamPath = streamPath;
         this.limitTweets = limitTweets;
     }
@@ -39,8 +39,8 @@ public class TweetsWrapper {
     }
 
     public List<TweetModel> queryTweets(List<String> field, String query) throws IOException {
-        Map <Integer, Document> tweets = LuceneWrapper.searchIndex(field, query);
-        IndexReader ir = LuceneWrapper.getIndexReader();
+        Map <Integer, Document> tweets = LuceneHandler.searchIndex(field, query);
+        IndexReader ir = LuceneHandler.getIndexReader();
         List<TweetModel> tweetsModel = new ArrayList<TweetModel>();
         for(int tweetId: tweets.keySet()) {
             TweetModel tweetModel = new TweetModel();
@@ -53,14 +53,14 @@ public class TweetsWrapper {
             tweetModel.setText(tweets.get(tweetId).get("text"));
             tweetModel.setDocId(tweetId);
             tweetModel.setUserId(tweets.get(tweetId).get("user_id"));
-            tweetModel.setTermsVector(LuceneWrapper.getTermVector(ir, tweetId, "text"));
+            tweetModel.setTermsVector(LuceneHandler.getTermVector(ir, tweetId, "text"));
             tweetsModel.add(tweetModel);
         }
         return tweetsModel;
     }
 
     public Map<String, Long> getTermsFrequency(String field, String query, int topN) throws IOException {
-        Map<String, Long> termsFrequency = LuceneWrapper.getTermsFrequency(field, query);
+        Map<String, Long> termsFrequency = LuceneHandler.getTermsFrequency(field, query);
         Map<String, Long> termsFrequencyLimited = termsFrequency
                 .entrySet()
                 .stream()
@@ -71,8 +71,8 @@ public class TweetsWrapper {
     }
 
     public Map<String, Long> getTermsFrequencyByDocIds(int [] docIds) throws IOException {
-        IndexReader ir = LuceneWrapper.getIndexReader();
-        return LuceneWrapper.getTermsFrequencyByDocIds(ir, docIds);
+        IndexReader ir = LuceneHandler.getIndexReader();
+        return LuceneHandler.getTermsFrequencyByDocIds(ir, docIds);
     }
 
     public static List<TweetModel> addSupportToTweetModel(List<TweetModel> tweets,  HashMap<String, String> users) {
@@ -103,7 +103,7 @@ public class TweetsWrapper {
             Instant start = Instant.now();
             for (File file : files) {
                 Stream<JsonObject> tweets = this.readFile(file);
-                int numTweetsIndexed = LuceneWrapper.indexTweets(tweets);
+                int numTweetsIndexed = LuceneHandler.indexTweets(tweets);
                 Instant end = Instant.now();
                 long duration = Duration.between(start, end).getSeconds();
                 filesProcessed += 1;

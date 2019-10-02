@@ -40,5 +40,14 @@
     <orderEntry type="library" name="Maven: org.apache.logging.log4j:log4j-api:2.8.2" level="project" />
     <orderEntry type="library" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:guava:18.0" level="project" />
+    <orderEntry type="library" name="Maven: org.mapdb:mapdb:3.0.7" level="project" />
+    <orderEntry type="library" name="Maven: org.jetbrains.kotlin:kotlin-stdlib:1.2.71" level="project" />
+    <orderEntry type="library" name="Maven: org.jetbrains.kotlin:kotlin-stdlib-common:1.2.71" level="project" />
+    <orderEntry type="library" name="Maven: org.jetbrains:annotations:13.0" level="project" />
+    <orderEntry type="library" name="Maven: org.eclipse.collections:eclipse-collections-api:10.0.0" level="project" />
+    <orderEntry type="library" name="Maven: org.eclipse.collections:eclipse-collections:10.0.0" level="project" />
+    <orderEntry type="library" name="Maven: org.eclipse.collections:eclipse-collections-forkjoin:10.0.0" level="project" />
+    <orderEntry type="library" name="Maven: net.jpountz.lz4:lz4:1.3.0" level="project" />
+    <orderEntry type="library" name="Maven: org.mapdb:elsa:3.0.0-M5" level="project" />
   </component>
 </module>

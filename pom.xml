@@ -75,6 +75,11 @@
       <artifactId> G </artifactId>
       <version> 1.0.0-PUBLIC </version>
     </dependency>
+    <dependency>
+      <groupId>org.mapdb</groupId>
+      <artifactId>mapdb</artifactId>
+      <version>3.0.7</version>
+    </dependency>
   </dependencies>
 
   <build>

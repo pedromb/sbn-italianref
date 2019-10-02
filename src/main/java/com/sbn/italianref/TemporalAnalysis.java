@@ -1,5 +1,10 @@
 package com.sbn.italianref;
 
+import com.sbn.italianref.Handlers.CSVHandler;
+import com.sbn.italianref.Handlers.GraphHandler;
+import com.sbn.italianref.Handlers.TweetsHandler;
+import com.sbn.italianref.Models.TermsTimeSeriesModel;
+import com.sbn.italianref.Models.TweetModel;
 import it.stilo.g.structures.WeightedUndirectedGraph;
 import it.stilo.g.util.NodesMapper;
 import net.seninp.jmotif.sax.SAXException;
@@ -12,8 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -21,139 +24,90 @@ import java.util.stream.Collectors;
 
 public class TemporalAnalysis {
 
-    public static List<TweetModel> influencersSupportAnalysis(
-            TweetsWrapper tweetsWrapper,
-            HashMap<String, String> users,
-            Path distributionFilename,
-            boolean includeRetweets
+    public static List<TweetModel> getUsersSupport(
+            TweetsHandler tweetsHandler, HashMap<String, String> users, Path pathToSave
     ) throws IOException {
-
         System.out.println("");
-        System.out.println("#################### Temporal Analysis - Part 1 ####################");
-        String luceneQuery = "";
-        for(String user : users.keySet()) {
-            if(luceneQuery.length() == 0) {
-                luceneQuery += user;
-            }
-            else {
-                luceneQuery += " || "+user;
-            }
-        }
-        String field = includeRetweets ? "user_created_tweet" : "user";
-        List<String> fields = new ArrayList<>();
-        fields.add(field);
-        List<TweetModel> tweets = tweetsWrapper.queryTweets(fields, luceneQuery);
-        tweets = tweetsWrapper.addSupportToTweetModel(tweets, users);
-        printNumberOfUsersBySupport(tweets);
-        printNumberOfTweets(tweets, includeRetweets);
-        saveDistributionList(tweets, distributionFilename);
+        System.out.println("Temporal Analysis");
         System.out.println("");
-        System.out.println("################ End of Temporal Analysis - Part 1  #################");
+        System.out.println("[Temporal Analysis - Part 1] Part 1 starting!");
+        String luceneQuery = constructLuceneQueryForUser(users.keySet());
+        List<String> fields = new ArrayList<>(){{add("user");}};
+        System.out.print("[Temporal Analysis - Part 1] Retrieving tweets from lucene index...");
+        List<TweetModel> tweets = tweetsHandler.queryTweets(fields, luceneQuery);
+        tweets = tweetsHandler.addSupportToTweetModel(tweets, users);
+        System.out.println("DONE");
+        System.out.print("[Temporal Analysis - Part 1] Saving tweets distribution over time...");
+        saveTweetsByUserBySupportByTime(tweets, pathToSave);
+        System.out.println("DONE - File saved in "+pathToSave.toString());
+        System.out.println("[Temporal Analysis - Part 1] Part 1 DONE!");
         return tweets;
     }
 
-    public static Map<String, Map<String, List<String>>> clusterTerms(
-            TweetsWrapper tweetsWrapper,
-            HashMap<String, String> users,
+    public static Map<String, Map<String, List<String>>> saxClusters(
+            TweetsHandler tweetsHandler,
             List<TweetModel> tweets,
-            boolean includeRetweets,
             int timeWindow,
             int alphabetSize,
             int k,
             int maxIterations,
-            Path clustersYesPath,
-            Path clustersNoPath
+            Path clustersPath
     ) throws IOException, SAXException {
         System.out.println("");
-        System.out.println("#################### Temporal Analysis - Part 2 ####################");
-        System.out.println("");
-        String luceneQueryYes = "";
-        String luceneQueryNo = "";
-
-        for(String user : users.keySet()) {
-            if(users.get(user).equals("yes")) {
-                if(luceneQueryYes.length() == 0) {
-                    luceneQueryYes += user;
-                }
-                else {
-                    luceneQueryYes += " | "+user;
-                }
-            } else {
-                if(luceneQueryNo.length() == 0) {
-                    luceneQueryNo += user;
-                }
-                else {
-                    luceneQueryNo += " | "+user;
-                }
-            }
-
-        }
-        String field = includeRetweets ? "user_created_tweet" : "user";
-        NormalAlphabet na = new NormalAlphabet();
-        double[][] distanceMatrix = na.getDistanceMatrix(alphabetSize);
-
+        System.out.println("[Temporal Analysis - Part 2] Part 2 starting!");
         List<TweetModel> tweetsYes = tweets.stream()
                 .filter(x -> x.getActualSupport().equals("yes"))
                 .collect(Collectors.toList());
         List<TweetModel> tweetsNo = tweets.stream()
                 .filter(x -> x.getActualSupport().equals("no"))
                 .collect(Collectors.toList());
+        Set<String> usersYes = tweetsYes
+                .stream()
+                .map(TweetModel::getUser)
+                .collect(Collectors.toSet());
+        Set<String> usersNo = tweetsNo
+                .stream()
+                .map(TweetModel::getUser)
+                .collect(Collectors.toSet());
 
+        String luceneQueryYes = constructLuceneQueryForUser(usersYes);
+        String luceneQueryNo = constructLuceneQueryForUser(usersNo);
 
-        Map<String, Long> termsFreqYes = tweetsWrapper.getTermsFrequency(field, luceneQueryYes, 1000);
-        Map<String, TermsTimeSeries> timeseriesYes = getTermsTimeseries(termsFreqYes, tweetsYes, timeWindow);
+        NormalAlphabet na = new NormalAlphabet();
+        double[][] distanceMatrix = na.getDistanceMatrix(alphabetSize);
+
+        System.out.print("[Temporal Analysis - Part 2] Getting top 1000 words by frequency for YES supporters...");
+        Map<String, Long> termsFreqYes = tweetsHandler.getTermsFrequency("user", luceneQueryYes, 1000);
+        System.out.println("DONE.");
+        System.out.print("[Temporal Analysis - Part 2] Creating sax strings for each word (12h grain)...");
+        Map<String, TermsTimeSeriesModel> timeseriesYes = getTermsTimeseries(termsFreqYes, tweetsYes, timeWindow);
         timeseriesYes = addSax(timeseriesYes, alphabetSize, timeWindow);
-        System.out.println("#################### Top 5 Words - Yes Support ####################");
-        System.out.println("");
-        termsFreqYes.entrySet()
-                .stream()
-                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-                .limit(5)
-                .forEach(x -> {
-                    System.out.println(x.getKey() + ": "+x.getValue() + " ");
-                });
-        System.out.println("");
+        System.out.println("DONE.");
 
-        Map<String, Long> termsFreqNo = tweetsWrapper.getTermsFrequency(field, luceneQueryNo, 1000);
-        Map<String, TermsTimeSeries> timeseriesNo = getTermsTimeseries(termsFreqNo, tweetsNo, timeWindow);
+        System.out.print("[Temporal Analysis - Part 2] Getting top 1000 words by frequency for NO supporters...");
+        Map<String, Long> termsFreqNo = tweetsHandler.getTermsFrequency("user", luceneQueryNo, 1000);
+        System.out.println("DONE.");
+        System.out.print("[Temporal Analysis - Part 2] Creating sax strings for each word (12h grain)...");
+        Map<String, TermsTimeSeriesModel> timeseriesNo = getTermsTimeseries(termsFreqNo, tweetsNo, timeWindow);
         timeseriesNo = addSax(timeseriesNo, alphabetSize, timeWindow);
-        System.out.println("#################### Top 5 Words - No Support ####################");
-        System.out.println("");
-        termsFreqNo.entrySet()
-                .stream()
-                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-                .limit(5)
-                .forEach(x -> {
-                    System.out.println(x.getKey() + ": "+x.getValue());
-                });
-        System.out.println("");
+        System.out.println("DONE.");
 
-        System.out.println("#################### Running KMeans - Yes Support ####################");
+
+        System.out.print("[Temporal Analysis - Part 2] Running KMeans for YES words...");
         Map<String, List<String>> clustersYes = KMeans.fitForSax(timeseriesYes, k, distanceMatrix, alphabetSize, maxIterations);
-        List<String[]> clustersRowsYes = createClusterLists(clustersYes, termsFreqYes, timeseriesYes);
-        Map<Integer, List<String>> topWordsByClusterYes = getTopWordsByCluster(clustersYes, termsFreqYes, 10);
-        topWordsByClusterYes.entrySet()
-                .stream()
-                .forEach(x -> {
-                    System.out.println("Cluster "+x.getKey()+": "+x.getValue());
-                });
-        CSVHandler.write(clustersYesPath, clustersRowsYes);
-        System.out.println("");
+        System.out.println("DONE.");
 
-        System.out.println("#################### Running KMeans - No Support ####################");
+
+        System.out.print("[Temporal Analysis - Part 2] Running KMeans for NO words...");
         Map<String, List<String>> clustersNo = KMeans.fitForSax(timeseriesNo, k, distanceMatrix, alphabetSize, maxIterations);
-        List<String[]> clustersRowsNo = createClusterLists(clustersNo, termsFreqNo, timeseriesNo);
-        Map<Integer, List<String>> topWordsByClusterNo = getTopWordsByCluster(clustersNo, termsFreqNo, 10);
-        topWordsByClusterNo.entrySet()
-                .stream()
-                .forEach(x -> {
-                    System.out.println("Cluster "+x.getKey()+": "+x.getValue());
-                });
-        System.out.println("");
-        CSVHandler.write(clustersNoPath, clustersRowsNo);
-        System.out.println("");
-        System.out.println("################ End of Temporal Analysis - Part 2  #################");
-        System.out.println("");
+        System.out.println("DONE.");
+
+        System.out.print("[Temporal Analysis - Part 2] Saving clusters file...");
+        List<String[]> rows = createClustersCsv(clustersYes, clustersNo, termsFreqYes, termsFreqNo);
+        CSVHandler.write(clustersPath, rows);
+        System.out.println("DONE - File saved in "+clustersPath.toString());
+        System.out.println("[Temporal Analysis - Part 2] Part 2 DONE!");
+        System.out.println();
 
         Map<String, Map<String, List<String>>> clustersBySupport = new HashMap<>();
         clustersBySupport.put("yes", clustersYes);
@@ -168,8 +122,11 @@ public class TemporalAnalysis {
             Path graphsPath
     ) throws IOException, ParseException, InterruptedException {
 
+        System.out.println("[Temporal Analysis - Part 3] Part 3 starting!");
+
         Map<String, List<String>> yesClusters = clusterBySupport.get("yes");
         Map<String, List<String>> noClusters = clusterBySupport.get("no");
+
         List<TweetModel> tweetsYes = tweets.stream()
                 .filter(x -> x.getActualSupport().equals("yes"))
                 .collect(Collectors.toList());
@@ -178,11 +135,10 @@ public class TemporalAnalysis {
                 .filter(x -> x.getActualSupport().equals("no"))
                 .collect(Collectors.toList());
 
-        Map<String, Set<Integer>> yesTweetsTermsInverseIndex = getTweetsTermInverseIndex(tweetsYes);
-        Map<String, Set<Integer>> noTweetsTermsInverseIndex = getTweetsTermInverseIndex(tweetsNo);
 
         Path yesGraphsPath = Paths.get(graphsPath.toString() + "/yes/");
         Path noGraphsPath = Paths.get(graphsPath.toString() + "/no/");
+
         if (!Files.exists(yesGraphsPath)) {
             try {
                 Files.createDirectories(yesGraphsPath);
@@ -197,25 +153,41 @@ public class TemporalAnalysis {
                 e.printStackTrace();
             }
         }
+
+        System.out.println("[Temporal Analysis - Part 3] Processing graphs for YES tokens...");
+        Map<String, Set<Integer>> yesTweetsTermsInverseIndex = getTweetsTermInverseIndex(tweetsYes);
         int clusterId = 1;
         for(List<String> clusterTerms: yesClusters.values()) {
             processGraphs(clusterTerms, yesTweetsTermsInverseIndex, 0.1, yesGraphsPath, clusterId);
             clusterId += 1;
         }
+        System.out.println("[Temporal Analysis - Part 3] Finished processing graphs for YES tokens!");
+
+        System.out.println("[Temporal Analysis - Part 3] Processing graphs for NO tokens...");
+
+        Map<String, Set<Integer>> noTweetsTermsInverseIndex = getTweetsTermInverseIndex(tweetsNo);
         clusterId = 1;
         for(List<String> clusterTerms: noClusters.values()) {
             processGraphs(clusterTerms, noTweetsTermsInverseIndex, 0.1, noGraphsPath, clusterId);
             clusterId += 1;
         }
+        System.out.println("[Temporal Analysis - Part 3] Finished processing graphs for NO tokens!");
+        System.out.println("[Temporal Analysis - Part 3] Part 3 DONE!");
+        System.out.println();
+
 
 
     }
 
     public static void coreComponentsTimeseris(
-            TweetsWrapper tw,
+            TweetsHandler tw,
             List<TweetModel> tweets,
-            int k
+            int k,
+            Path kCoreTimeseriesYesPath,
+            Path kCoreTimeseriesNoPath
     ) throws IOException {
+        System.out.println("[Temporal Analysis - Part 4] Part 4 starting!");
+
         List<TweetModel> tweetsYes = tweets.stream()
                 .filter(x -> x.getActualSupport().equals("yes"))
                 .collect(Collectors.toList());
@@ -241,38 +213,47 @@ public class TemporalAnalysis {
         yesRows.add(header);
         noRows.add(header);
 
-        for(int i = 0; i<k; i++) {
-            int clusterId = i+1;
+        System.out.print("[Temporal Analysis - Part 4] Getting timeseries for each k-core obtatined in part 3...");
+
+        for(int i = 1; i<k+1; i++) {
+            int clusterId = i;
             List<String> yesComponents = getGraphComponents("yes", clusterId);
-            Map<String, TermsTimeSeries> timeseriesYes = getTermsTimeseries(yesTermsFreq, tweetsYes, 3);
+            Map<String, TermsTimeSeriesModel> timeseriesYes = getTermsTimeseries(yesTermsFreq, tweetsYes, 3);
             timeseriesYes = timeseriesYes.entrySet()
                     .stream()
-                    .filter(x -> yesComponents.contains(x.getValue().term))
+                    .filter(x -> yesComponents.contains(x.getValue().getTerm()))
                     .collect(Collectors.toMap(x -> x.getKey(), x-> x.getValue()));
             List<String[]> yesNewRows = getGraphRows(timeseriesYes, clusterId);
             yesRows.addAll(yesNewRows);
 
             List<String> noComponents = getGraphComponents("no", clusterId);
-            Map<String, TermsTimeSeries> timeseriesNo = getTermsTimeseries(noTermsFreq, tweetsNo, 3);
+            Map<String, TermsTimeSeriesModel> timeseriesNo = getTermsTimeseries(noTermsFreq, tweetsNo, 3);
             timeseriesNo = timeseriesNo.entrySet()
                     .stream()
-                    .filter(x -> noComponents.contains(x.getValue().term))
+                    .filter(x -> noComponents.contains(x.getValue().getTerm()))
                     .collect(Collectors.toMap(x -> x.getKey(), x-> x.getValue()));
             List<String[]> noNewsRo = getGraphRows(timeseriesNo, clusterId);
             noRows.addAll(noNewsRo);
         }
-        Path yesPath = Paths.get("graphs_yes.csv");
-        CSVHandler.write(yesPath, yesRows);
-        Path noPath = Paths.get("graphs_no.csv");
-        CSVHandler.write(noPath, noRows);
+        System.out.println("DONE.");
+        System.out.print("[Temporal Analysis - Part 4] Saving files for YES groups...");
+        CSVHandler.write(kCoreTimeseriesYesPath, yesRows);
+        System.out.println("DONE - File saved in "+kCoreTimeseriesYesPath.toString());
+        System.out.print("[Temporal Analysis - Part 4] Saving files for NO groups...");
+        CSVHandler.write(kCoreTimeseriesNoPath, noRows);
+        System.out.println("DONE - File saved in "+kCoreTimeseriesNoPath.toString());
+        System.out.println("[Temporal Analysis - Part 4] Part 4 DONE!");
+        System.out.println();
+        System.out.println("Temporal Analysis DONE!");
+        System.out.println();
 
     }
 
-    private static List<String[]> getGraphRows(Map<String, TermsTimeSeries> timeseries, int clusterId) {
+    private static List<String[]> getGraphRows(Map<String, TermsTimeSeriesModel> timeseries, int clusterId) {
         List<String[]> rows= new ArrayList<String[]>();
         String cluster = String.valueOf(clusterId);
         for(String term : timeseries.keySet()) {
-            TermsTimeSeries termTs = timeseries.get(term);
+            TermsTimeSeriesModel termTs = timeseries.get(term);
             if(termTs != null) {
                 double[] ts = timeseries.get(term).getCompressedTs();
                 LocalDateTime[] dates = timeseries.get(term).getCompressedTsDates();
@@ -297,18 +278,27 @@ public class TemporalAnalysis {
         String largestCCFolder = graphsPath.toString() + "/largest_cc_graph_" + clusterId + ".txt";
         String kCoreFolder = graphsPath.toString() + "/k_core_graph_" + clusterId + ".txt";
 
+
         NodesMapper<String> mapper = new NodesMapper<>();
-        WeightedUndirectedGraph yesGraph = GraphWrapper.createCoGraph(
-                clusterTerms, tweetsTermsInverseIndex, mapper, threshold
-        );
-        WeightedUndirectedGraph yesCCGraph = GraphWrapper.getLargestConnectedComponent(yesGraph);
-        WeightedUndirectedGraph yesKCoreGraph = GraphWrapper.getKCore(yesGraph);
+        System.out.print("[Temporal Analysis - Part 3] Cluster "+clusterId+": Creating co-occurrence graph...");
+        WeightedUndirectedGraph yesGraph = GraphHandler.createCoGraph(clusterTerms, tweetsTermsInverseIndex, mapper, threshold);
+        System.out.println("DONE.");
+        System.out.print("[Temporal Analysis - Part 3] Cluster "+clusterId+": Getting largest connected component...");
+        WeightedUndirectedGraph yesCCGraph = GraphHandler.getLargestConnectedComponent(yesGraph);
+        System.out.println("DONE.");
+        System.out.print("[Temporal Analysis - Part 3] Cluster "+clusterId+": Getting k-core...");
+        WeightedUndirectedGraph yesKCoreGraph = GraphHandler.getKCore(yesGraph);
+        System.out.println("DONE.");
+
+        System.out.print("[Temporal Analysis - Part 3] Cluster "+clusterId+": Saving files...");
+
         Path fullGraphPath = Paths.get(fullGraphFolder);
         Path largestCCPath = Paths.get(largestCCFolder);
         Path kCorePath = Paths.get(kCoreFolder);
-        Set<String> fullGraphComponents = GraphWrapper.saveGraph(yesGraph, fullGraphPath);
-        Set<String> coreComponentComponents = GraphWrapper.saveGraph(yesCCGraph, largestCCPath);
-        Set<String> kCoreComponents = GraphWrapper.saveGraph(yesKCoreGraph, kCorePath);
+
+        Set<String> fullGraphComponents = GraphHandler.saveGraph(yesGraph, fullGraphPath, mapper);
+        Set<String> coreComponentComponents = GraphHandler.saveGraph(yesCCGraph, largestCCPath, mapper);
+        Set<String> kCoreComponents = GraphHandler.saveGraph(yesKCoreGraph, kCorePath, mapper);
 
         String fullGraphComponentsFolder = graphsPath.toString() + "/full_graph_components" + clusterId + ".txt";
         String largestCCComponentsFolder = graphsPath.toString() + "/largest_cc_graph_components" + clusterId + ".txt";
@@ -320,10 +310,13 @@ public class TemporalAnalysis {
         Files.write(fullGraphComponentsPath, fullGraphComponents, StandardCharsets.UTF_8);
         Files.write(largestCCComponentsPath, coreComponentComponents, StandardCharsets.UTF_8);
         Files.write(kCoreComponentsPath, kCoreComponents, StandardCharsets.UTF_8);
+        String filesLocation = graphsPath.toString() + "/*" + clusterId + ".txt";
+        System.out.println("DONE - Files saved in folder "+filesLocation);
+
 
     }
 
-    private static Map<String, TermsTimeSeries> getTermsTimeseries(Map<String, Long> terms, List<TweetModel> tweets, int timeWindow) {
+    private static Map<String, TermsTimeSeriesModel> getTermsTimeseries(Map<String, Long> terms, List<TweetModel> tweets, int timeWindow) {
         LocalDateTime maxDate =  Collections
                 .max(tweets, Comparator.comparing(t -> t.getCreatedAtTruncatedHours()))
                 .getCreatedAtTruncatedHours();
@@ -337,7 +330,7 @@ public class TemporalAnalysis {
             minDate = minDate.plusHours(1);
             intervals.add(minDate);
         }
-        Map<String, TermsTimeSeries> termsTimeSeries = new HashMap<String, TermsTimeSeries>();
+        Map<String, TermsTimeSeriesModel> termsTimeSeries = new HashMap<String, TermsTimeSeriesModel>();
         for(TweetModel tweet : tweets) {
             Map<String, Long> termsVector = tweet.getTermsVector();
             for(String term : termsVector.keySet()) {
@@ -346,13 +339,13 @@ public class TemporalAnalysis {
                     int position = intervals.indexOf(termDate);
                     long termFreq = termsVector.get(term);
                     if(termsTimeSeries.containsKey(term)) {
-                        TermsTimeSeries ts = termsTimeSeries.get(term);
+                        TermsTimeSeriesModel ts = termsTimeSeries.get(term);
                         ts.addToOriginalTs(termFreq, position);
                     } else {
                         double[] ts = new double[intervals.size()];
                         Arrays.fill(ts, 0);
                         ts[position] = termFreq;
-                        TermsTimeSeries newTs = new TermsTimeSeries();
+                        TermsTimeSeriesModel newTs = new TermsTimeSeriesModel();
                         newTs.setTerm(term);
                         newTs.setOriginalTs(ts);
                         termsTimeSeries.put(term, newTs);
@@ -375,79 +368,22 @@ public class TemporalAnalysis {
         return termsTimeSeries;
     }
 
-    private static List<String[]> createDistributionList(List<TweetModel> tweets) {
-        String[] header = new String[]{"date", "support", "number_of_tweets"};
-        List <String[]> rows = new ArrayList<String[]>();
+    private static void saveTweetsByUserBySupportByTime(List<TweetModel> tweets, Path pathToSave) {
+        List<String[]> rows = new ArrayList<>();
+        String[] header = new String[] {"support", "user", "created_at"};
         rows.add(header);
-        Map<LocalDateTime, Map<String, Long>> distribution = tweets
-                .stream()
-                .collect(
-                        Collectors.groupingBy(x -> x.getCreatedAtTruncatedHours(),
-                                Collectors.groupingBy(TweetModel::getActualSupport, Collectors.counting()))
-                );
-        TreeMap<LocalDateTime, Map<String, Long>> sortedDistribution = new TreeMap<>(distribution);
-        for(LocalDateTime dateTime: sortedDistribution.keySet()) {
-            String[] newRowYes = new String[3];
-            String[] newRowNo = new String[3];
-            String date = dateTime.toString();
-            String supportYesNTweets = sortedDistribution.get(dateTime).containsKey("yes") ?
-                    sortedDistribution.get(dateTime).get("yes").toString() : "0";
-            String supportNoNTweets =  sortedDistribution.get(dateTime).containsKey("no") ?
-                    sortedDistribution.get(dateTime).get("no").toString() : "0";
-            newRowYes[0] = date;
-            newRowYes[1] = "yes";
-            newRowYes[2] = supportYesNTweets;
-            newRowNo[0] = date;
-            newRowNo[1] = "no";
-            newRowNo[2] = supportNoNTweets;
-            rows.add(newRowNo);
-            rows.add(newRowYes);
+        for (TweetModel tweet: tweets) {
+            String[] row = new String[header.length];
+            row[0] = tweet.getActualSupport();
+            row[1] = tweet.getUser();
+            row[2] = tweet.getCreatedAtTruncatedHours().toString();
+            rows.add(row);
         }
-        return rows;
+        CSVHandler.write(pathToSave, rows);
     }
 
-    private static void printNumberOfUsersBySupport(List<TweetModel> tweets) {
-        Map<String, Integer> usersBySupport = tweets
-                .stream()
-                .collect(Collectors.groupingBy(TweetModel::getUserSupport,
-                        Collectors.collectingAndThen(Collectors.mapping(
-                                TweetModel::getUser, Collectors.toSet()),
-                                Set::size)));
-        System.out.println("");
-        System.out.println("########## Number of Users by Support ##########\n");
-        System.out.println("Yes: " + usersBySupport.get("yes"));
-        System.out.println("No: " + usersBySupport.get("no"));
-        System.out.println("\n################################################");
-    }
-
-    private static void printNumberOfTweets(List<TweetModel> tweets, boolean includeRetweets) {
-
-        Map<String, Long> usersBySupport = tweets
-                .stream()
-                .collect(
-                        Collectors.groupingBy(
-                                x -> includeRetweets ? x.getActualSupport() : x.getUserSupport(),
-                                Collectors.counting()
-                        )
-                );
-        System.out.println("");
-        System.out.println("########## Number of Tweets by Support ##########\n");
-        System.out.println("Yes: " + usersBySupport.get("yes"));
-        System.out.println("No: " + usersBySupport.get("no"));
-        System.out.println("\n#################################################");
-    }
-
-    private static void saveDistributionList(List<TweetModel> tweets, Path distributionFilename) {
-        System.out.println("");
-        System.out.println("########## Distribution of Tweets Over Time ##########\n");
-        List<String[]> distribution = createDistributionList(tweets);
-        CSVHandler.write(distributionFilename, distribution);
-        System.out.println("File saved to: "+distributionFilename);
-        System.out.println("\n######################################################");
-    }
-
-    private static  Map<String, TermsTimeSeries> addSax(
-            Map<String, TermsTimeSeries> ts, int alphabetSize, int timeWindow
+    private static  Map<String, TermsTimeSeriesModel> addSax(
+            Map<String, TermsTimeSeriesModel> ts, int alphabetSize, int timeWindow
     ) throws SAXException {
         double nThreshold = 0.0001;
         NormalAlphabet na = new NormalAlphabet();
@@ -475,64 +411,48 @@ public class TemporalAnalysis {
         return ts;
     }
 
-    private static List<String[]> createClusterLists(
-            Map<String, List<String>> clusters,
-            Map<String, Long> freqs,
-            Map<String, TermsTimeSeries> timeSeries) {
+    private static List<String[]> createClustersCsv(
+            Map<String, List<String>> clustersYes,
+            Map<String, List<String>> clustersNo,
+            Map<String, Long> freqsYes,
+            Map<String, Long> freqsNo
+    ) {
         List<String[]> rows= new ArrayList<String[]>();
-        TermsTimeSeries tsFirst = (TermsTimeSeries) timeSeries.values().toArray()[0];
-        String[] header = new String[5];
+        String[] header = new String[4];
         header[0] = "term";
         header[1] = "cluster";
-        header[2] = "total_tweets";
-        header[3] = "date";
-        header[4] = "number_of_tweets";
+        header[2] = "support";
+        header[3] = "number_of_tweets";
         rows.add(header);
-        int cluster = 0;
-        for(String clusterSax:clusters.keySet()) {
-            for(String term : clusters.get(clusterSax)) {
+        rows = addRowsToListClusters(rows, clustersYes, freqsYes, "yes");
+        rows = addRowsToListClusters(rows, clustersNo, freqsNo, "no");
 
-                TermsTimeSeries termTs = timeSeries.get(term);
-                if(termTs != null) {
-                    double[] ts = timeSeries.get(term).getCompressedTs();
-                    LocalDateTime[] dates = timeSeries.get(term).getCompressedTsDates();
-                    for (int i = 0; i < ts.length; i++) {
-                        String[] newEntry = new String[header.length];
-                        newEntry[0] = term;
-                        newEntry[1] = String.valueOf(cluster);
-                        newEntry[2] = String.valueOf(freqs.get(term));
-                        newEntry[3] = String.valueOf(dates[i]);
-                        newEntry[4] = String.valueOf(ts[i]);
-                        rows.add(newEntry);
-
-                    }
-                }
-            }
-            cluster += 1;
-        }
         return rows;
     }
 
-    private static Map<Integer, List<String>> getTopWordsByCluster(
+    private static List<String[]> addRowsToListClusters(
+            List<String[]> rows,
             Map<String, List<String>> clusters,
             Map<String, Long> freqs,
-            int topN
+            String support
     ) {
-        Map<Integer, List<String>> res = new HashMap<>();
-        int cluster = 0;
-        for(String clusterString : clusters.keySet()) {
-            List<String> clusterTerms = clusters.get(clusterString);
-            List<String> topFreqTerms = freqs.entrySet()
-                    .stream()
-                    .filter(x -> clusterTerms.contains(x.getKey()))
-                    .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-                    .limit(topN)
-                    .collect(Collectors.toMap(x->x.getKey(), x->x.getValue()))
-                    .keySet().stream().collect(Collectors.toList());
-            res.put(cluster, topFreqTerms);
-            cluster += 1;
+
+        int stringLength = rows.get(0).length;
+        int clusterId = 1;
+        for(String cluster : clusters.keySet()) {
+            List<String> clusterTerms = clusters.get(cluster);
+            for (String term : clusterTerms) {
+                String [] newRow = new String[stringLength];
+                newRow[0] = term;
+                newRow[1] = String.valueOf(clusterId);
+                newRow[2] = support;
+                newRow[3] = String.valueOf(freqs.get(term));
+                rows.add(newRow);
+            }
+            clusterId += 1;
         }
-        return res;
+        return rows;
+
     }
 
     private static double[] compressTimeSeries(double [] oldTs, int window) {
@@ -582,9 +502,18 @@ public class TemporalAnalysis {
 
     private static List<String> getGraphComponents(String support, int clusterId) throws IOException {
         Path componentsPath = Paths.get(
-                "graphs/"+support+"/k_core_graph_components"+clusterId+".txt");
+                "temporal_analysis/graphs/"+support+"/k_core_graph_components"+clusterId+".txt");
         List<String> components = Files.readAllLines(componentsPath);
         return components;
+    }
+
+    private static String constructLuceneQueryForUser(Set<String> users) {
+        String luceneQuery = "";
+        for(String user : users) {
+            luceneQuery += luceneQuery.length() == 0 ? user : " || "+user;
+
+        }
+        return luceneQuery;
     }
 
 }

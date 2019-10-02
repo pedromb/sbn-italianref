@@ -1,6 +1,7 @@
-package com.sbn.italianref;
+package com.sbn.italianref.Handlers;
 
 import com.google.gson.JsonObject;
+import com.sbn.italianref.ProcessText;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
-public class LuceneWrapper {
+public class LuceneHandler {
 
 
     private static int documentsProcessed = 0;
