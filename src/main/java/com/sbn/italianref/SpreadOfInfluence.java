@@ -5,8 +5,6 @@ import com.sbn.italianref.Handlers.CSVHandler;
 import com.sbn.italianref.Models.UserModel;
 import it.stilo.g.structures.WeightedDirectedGraph;
 import it.stilo.g.util.NodesMapper;
-import org.jetbrains.annotations.NotNull;
-import twitter4j.User;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -15,7 +13,7 @@ import java.util.stream.Collectors;
 public class SpreadOfInfluence {
 
 
-    public static void run(
+    public static void runLpa(
             WeightedDirectedGraph graph,
             NodesMapper<String> mapper,
             List<UserModel> users,
@@ -24,18 +22,42 @@ public class SpreadOfInfluence {
             Path usersMPath,
             Path usersM2Path
     ) {
-        System.out.println("Spread of Influence");
+        System.out.println("Spread of Influence - LPA");
         System.out.println();
 
-        System.out.print("[Spread of Influence] Using M starting...");
+        System.out.print("[Spread of Influence - LPA] Using M starting...");
         lpa(graph, mapper, users, "M", maxIterations, usersMPath);
         System.out.println("DONE - File saved in "+usersMPath.toString());
-        System.out.print("[Spread of Influence] Using M' starting...");
+        System.out.print("[Spread of Influence - LPA] Using M' starting...");
         lpa(graph, mapper, users, "M2", maxIterations, usersM2Path);
         System.out.println("DONE - File saved in "+usersM2Path.toString());
         System.out.println();
-        System.out.println("Spread of Influence DONE!");
+        System.out.println("Spread of Influence - LPA DONE!");
+        System.out.println();
     }
+
+    public static void runKMeans(
+            WeightedDirectedGraph graph,
+            NodesMapper<String> mapper,
+            List<UserModel> users,
+            int maxIterations,
+            Path usersKPath,
+            Path usersMPath,
+            Path usersM2Path
+    ) {
+        System.out.println("Spread of Influence - Modified LPA");
+        System.out.println();
+
+        System.out.print("[Spread of Influence - Modified LPA] Using M starting...");
+        kMeans(graph, mapper, users, "M", maxIterations, usersMPath);
+        System.out.println("DONE - File saved in "+usersMPath.toString());
+        System.out.print("[Spread of Influence - Modified LPA] Using M' starting...");
+        kMeans(graph, mapper, users, "M2", maxIterations, usersM2Path);
+        System.out.println("DONE - File saved in "+usersM2Path.toString());
+        System.out.println();
+        System.out.println("Spread of Influence - Modified LPA DONE!");
+    }
+
 
     public static void lpa(
             WeightedDirectedGraph graph,
@@ -60,17 +82,23 @@ public class SpreadOfInfluence {
         fileRows.add(header);
         List<String[]> initialRows = getNewRows(previousClusters, -1);
         fileRows.addAll(initialRows);
+        int countToBreak = 0;
         for(int i = 0; i<maxIterations; i++) {
             Map<Integer, String> newClusters = runLpaIteration(graph, previousClusters);
             List<String[]> newRows = getNewRows(newClusters, i);
             fileRows.addAll(newRows);
-            if(newClusters.equals(previousClusters)) break;
+            if(newClusters.equals(previousClusters)){
+                countToBreak += 1;
+            } else {
+                countToBreak = 0;
+            }
+            if(countToBreak == 10) break;
             previousClusters = newClusters;
         }
         CSVHandler.write(filePath, fileRows);
     }
 
-    public static Map<Integer, String> runLpaIteration(WeightedDirectedGraph g, @NotNull Map<Integer, String> clusters) {
+    public static Map<Integer, String> runLpaIteration(WeightedDirectedGraph g, Map<Integer, String> clusters) {
         List<Integer> nodes = clusters.keySet().stream().collect(Collectors.toList());
         Collections.shuffle(nodes);
         Map<Integer, String> newClusters = nodes
@@ -165,5 +193,211 @@ public class SpreadOfInfluence {
         }
         return initialClusters;
     }
+
+    public static void kMeans(
+            WeightedDirectedGraph graph,
+            NodesMapper<String> mapper,
+            List<UserModel> users,
+            String initialSeed,
+            int maxIterations,
+            Path filePath
+    ){
+        int [] graphNodes = graph.getVertex();
+        Set<Integer> graphNodesSet = Arrays.stream(graphNodes).boxed().collect(Collectors.toSet());
+        Set<String> userIdSet = new HashSet<>();
+        List<UserModel> usersFiltered = users
+                .stream()
+                .filter(x->graphNodesSet.contains(mapper.getId(x.getUserId())))
+                .filter(x->userIdSet.add(x.getUserId()))
+                .collect(Collectors.toList());
+
+        Map<Integer, String> previousClusters = getInitialClusters(usersFiltered, mapper, initialSeed);
+        Map<String, Integer> previousCentroids = getInitialCentroids(previousClusters);
+        List<String[]> fileRows = new ArrayList<>();
+        String [] header = new String[] {"iteration", "support", "n"};
+        fileRows.add(header);
+        List<String[]> initialRows = getNewRows(previousClusters, -1);
+        fileRows.addAll(initialRows);
+        int countToBreak = 0;
+        for(int i = 0; i < maxIterations; i++) {
+            Map<Integer, String> newClusters = runKMeansIteration(graph, previousClusters, previousCentroids);
+            Map<String, Integer> newCentroids = getNewCentroids(graph, previousClusters);
+            List<String[]> newRows = getNewRows(newClusters, i);
+            fileRows.addAll(newRows);
+            if(newClusters.equals(previousClusters)){
+                countToBreak += 1;
+            } else {
+                countToBreak = 0;
+            }
+            if(countToBreak == 10) break;
+            previousClusters = newClusters;
+            previousCentroids = newCentroids;
+        }
+        CSVHandler.write(filePath, fileRows);
+    }
+
+    public static Map<Integer, String> runKMeansIteration(WeightedDirectedGraph g, Map<Integer, String> clusters, Map<String, Integer> centroids) {
+        Map<Integer, String> newClusters = new HashMap<>();
+        for(int node : clusters.keySet()) {
+            Map<String, Double> results = calculateScore(g, clusters, node, centroids.get(clusters.get(node)));
+            double score = results.get("Yes") - results.get("No");
+
+            String newCluster = "";
+            if(score == 0) newCluster = getRandomLabel();
+            else newCluster = score > 0 ? "Yes" : "No";
+            newClusters.put(node, newCluster);
+        }
+        return newClusters;
+    }
+
+    private static Map<String, Integer> getNewCentroids(WeightedDirectedGraph g, Map<Integer, String> clusters) {
+        List<Integer> yesNodes = clusters
+                .entrySet()
+                .stream()
+                .filter(x->x.getValue().equals("Yes"))
+                .map(x->x.getKey())
+                .collect(Collectors.toList());
+        List<Integer> noNodes = clusters
+                .entrySet()
+                .stream()
+                .filter(x->x.getValue().equals("No"))
+                .map(x->x.getKey())
+                .collect(Collectors.toList());
+
+        Map<Integer, Map<String, Double>> yesNodesScores = yesNodes
+                .stream()
+                .collect(Collectors.toMap(
+                        x->x,
+                        x->calculateCentroidScore(g, clusters, x)
+                ));
+        Map<Integer, Map<String, Double>> noNodesScores = noNodes
+                .stream()
+                .collect(Collectors.toMap(
+                        x->x,
+                        x->calculateCentroidScore(g, clusters, x)
+                ));
+
+
+
+
+        int yesCentroid = 0;
+        double maxYes = -1;
+        int noCentroid = 0;
+        double maxNo = -1;
+        for(int node : yesNodesScores.keySet()) {
+            Map<String, Double> score = yesNodesScores.get(node);
+            double yesScore = score.get("Yes") - score.get("No");
+            if(yesScore > maxYes) {
+                maxYes = yesScore;
+                yesCentroid = node;
+            }
+        }
+        for(int node : noNodesScores.keySet()) {
+            Map<String, Double> score = noNodesScores.get(node);
+            double noScore = score.get("No") - score.get("Yes");
+            if(noScore > maxNo) {
+                maxNo = noScore;
+                noCentroid = node;
+            }
+        }
+
+        Map<String, Integer> centroids = new HashMap<>();
+
+        centroids.put("Yes", yesCentroid);
+        centroids.put("No", noCentroid);
+        return centroids;
+    }
+
+    private static Map<String, Double> calculateScore(
+            WeightedDirectedGraph g,
+            Map<Integer, String> clusters,
+            int node,
+            int centroid
+    ) {
+        Map<String, Double> results = new HashMap<>();
+        results.put("Yes", 0.);
+        results.put("No", 0.);
+        int[] neighbors = g.out[node];
+        int[] centroidNeighbors = centroid != -1 ? g.out[centroid] : null;
+        Map<String, Integer> neighborsResults = calculaceScoreAux(clusters, neighbors);
+        Map<String, Integer> centroidNeighborsResults = calculaceScoreAux(clusters, centroidNeighbors);
+        results.put("Yes", results.get("Yes") + 1.5*neighborsResults.get("Yes") + 0.5*centroidNeighborsResults.get("Yes"));
+        results.put("No", results.get("No") + 1.5*neighborsResults.get("No") + 0.5*centroidNeighborsResults.get("No"));
+        if(neighbors != null) {
+            for(int n : neighbors) {
+                Map<String, Integer> nResults = calculaceScoreAux(clusters, g.out[n]);
+                results.put("Yes", results.get("Yes") + 0.8*nResults.get("Yes"));
+                results.put("No", results.get("No") + 0.8*nResults.get("No"));
+            }
+        }
+        return results;
+    }
+
+    private static Map<String, Double> calculateCentroidScore(
+            WeightedDirectedGraph g,
+            Map<Integer, String> clusters,
+            int node
+    ) {
+        Map<String, Double> results = new HashMap<>();
+        results.put("Yes", 0.);
+        results.put("No", 0.);
+        int[] neighbors = g.out[node];
+        Map<String, Integer> neighborsResults = calculaceScoreAux(clusters, neighbors);
+        results.put("Yes", results.get("Yes") + 1.5*neighborsResults.get("Yes"));
+        results.put("No", results.get("No") + 1.5*neighborsResults.get("No"));
+        if(neighbors != null) {
+            for(int n : neighbors) {
+                Map<String, Integer> nResults = calculaceScoreAux(clusters, g.out[n]);
+                results.put("Yes", results.get("Yes") + nResults.get("Yes"));
+                results.put("No", results.get("No") + nResults.get("No"));
+            }
+        }
+        return results;
+    }
+
+    private static Map<String, Integer> calculaceScoreAux(Map<Integer, String> clusters, int [] nodes) {
+        int yesScore = 0;
+        int noScore = 0;
+        if(nodes != null) {
+            for(int i : nodes) {
+                if(clusters.get(i).equals("Yes")) {
+                    yesScore += 1;
+                } else if (clusters.get(i).equals("No")) {
+                    noScore += 1;
+                }
+            }
+        }
+        Map<String, Integer> results = new HashMap<>();
+        results.put("Yes", yesScore);
+        results.put("No", noScore);
+        return results;
+    }
+
+    public static Map<String, Integer> getInitialCentroids(Map<Integer, String> clusters) {
+        Map<String, Integer> centroids = new HashMap<>();
+        List<Integer> initialYes = clusters
+                .entrySet()
+                .stream()
+                .filter(x->x.getValue().equals("Yes"))
+                .map(x->x.getKey())
+                .collect(Collectors.toList());
+        List<Integer> initialNo = clusters
+                .entrySet()
+                .stream()
+                .filter(x->x.getValue().equals("No"))
+                .map(x->x.getKey())
+                .collect(Collectors.toList());
+
+        Random randomizer = new Random();
+        int noCentroid = initialNo.get(randomizer.nextInt(initialNo.size()));
+        int yesCentroid = initialYes.get(randomizer.nextInt(initialYes.size()));
+        centroids.put("Yes", yesCentroid);
+        centroids.put("No", noCentroid);
+        centroids.put("Neutral", -1);
+
+        return centroids;
+
+    }
+
 
 }

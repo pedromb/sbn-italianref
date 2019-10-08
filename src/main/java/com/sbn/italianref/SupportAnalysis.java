@@ -221,7 +221,7 @@ public class SupportAnalysis {
 
 
 
-    private static double centralityScore(double normalizedSupportScore, double normalizedHubScore) {
+    private static double  centralityScore(double normalizedSupportScore, double normalizedHubScore) {
         double metric = (2*normalizedHubScore + normalizedSupportScore) / 3;
         return metric;
     }

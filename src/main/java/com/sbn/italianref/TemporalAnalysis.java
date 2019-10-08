@@ -179,7 +179,7 @@ public class TemporalAnalysis {
 
     }
 
-    public static void coreComponentsTimeseris(
+    public static void coreComponentsTimeseries(
             TweetsHandler tw,
             List<TweetModel> tweets,
             int k,

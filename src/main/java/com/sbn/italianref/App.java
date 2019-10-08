@@ -39,9 +39,12 @@ public class App {
     private static String USERS_HITS_NO_CSV = IDENTIFYING_YES_NO_SUPPORTERS_FOLDER + "users_hits_no.csv";
     private static String KPP_SCORE_YES_CSV = IDENTIFYING_YES_NO_SUPPORTERS_FOLDER + "kpp_score_yes.csv";
     private static String KPP_SCORE_NO_CSV = IDENTIFYING_YES_NO_SUPPORTERS_FOLDER + "kpp_score_no.csv";
-    private static String SPREAD_OF_INFLUENCE_M_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_m.csv";
-    private static String SPREAD_OF_INFLUENCE_M2_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_m2.csv";
-    private static String SPREAD_OF_INFLUENCE_K_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_k.csv";
+    private static String SPREAD_OF_INFLUENCE_M_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_lpa_m.csv";
+    private static String SPREAD_OF_INFLUENCE_M2_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_lpa_m2.csv";
+    private static String SPREAD_OF_INFLUENCE_K_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_lpa_k.csv";
+    private static String SPREAD_OF_INFLUENCE_M_MODIFIED_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_modified_lpa_m.csv";
+    private static String SPREAD_OF_INFLUENCE_M2_MODIFIED_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_modified_lpa_m2.csv";
+    private static String SPREAD_OF_INFLUENCE_K_MODIFIED_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_modified_lpa_k.csv";
 
 
 
@@ -74,9 +77,13 @@ public class App {
         Path kppScoreYesCsv = Paths.get(KPP_SCORE_YES_CSV);
         Path kppScoresNoCsv = Paths.get(KPP_SCORE_NO_CSV);
 
-        Path spreadOfInfluenceM = Paths.get(SPREAD_OF_INFLUENCE_M_CSV);
-        Path spreadOfInfluenceM2 = Paths.get(SPREAD_OF_INFLUENCE_M2_CSV);
-        Path spreadOfInfluenceK = Paths.get(SPREAD_OF_INFLUENCE_K_CSV);
+        Path spreadOfInfluenceLpaM = Paths.get(SPREAD_OF_INFLUENCE_M_LPA_CSV);
+        Path spreadOfInfluenceLpaM2 = Paths.get(SPREAD_OF_INFLUENCE_M2_LPA_CSV);
+        Path spreadOfInfluenceLpaK = Paths.get(SPREAD_OF_INFLUENCE_K_LPA_CSV);
+
+        Path spreadOfInfluenceModifiedLpaM = Paths.get(SPREAD_OF_INFLUENCE_M_MODIFIED_LPA_CSV);
+        Path spreadOfInfluenceModifiedLpaM2 = Paths.get(SPREAD_OF_INFLUENCE_M2_MODIFIED_LPA_CSV);
+        Path spreadOfInfluenceModifiedLpaK = Paths.get(SPREAD_OF_INFLUENCE_K_MODIFIED_LPA_CSV);
 
         LuceneHandler.luceneIndexPath = luceneIndexPath;
         TweetsHandler tw = new TweetsHandler(streamPath, TWEETS_LIMIT);
@@ -102,7 +109,7 @@ public class App {
         );
 
         TemporalAnalysis.coreComponents(clustersBySupport, tweets, graphsFolder);
-        TemporalAnalysis.coreComponentsTimeseris(tw, tweets, 3, kCoreTsYesCsv, kCoreTsNoCsv);
+        TemporalAnalysis.coreComponentsTimeseries(tw, tweets, 3, kCoreTsYesCsv, kCoreTsNoCsv);
         NodesMapper<String> supportAnalysisGraphMapper = new NodesMapper<>();
         List<UserModel> usersModel = SupportAnalysis.getUsersModel(tw, usersMap, usersSupportCsv);
         WeightedDirectedGraph inducedGraph = SupportAnalysis.centralityAnalysis(
@@ -111,11 +118,14 @@ public class App {
 /*
         SupportAnalysis.kppNeg(usersModel, inducedGraph, supportAnalysisGraphMapper, kppScoreYesCsv, kppScoresNoCsv);
 */
-        SpreadOfInfluence.run(
+        SpreadOfInfluence.runLpa(
                 inducedGraph, supportAnalysisGraphMapper, usersModel, 100,
-                spreadOfInfluenceK, spreadOfInfluenceM, spreadOfInfluenceM2
+                spreadOfInfluenceLpaK, spreadOfInfluenceLpaM, spreadOfInfluenceLpaM2
         );
-
+        SpreadOfInfluence.runKMeans(
+                inducedGraph, supportAnalysisGraphMapper, usersModel, 100,
+                spreadOfInfluenceModifiedLpaK, spreadOfInfluenceModifiedLpaM, spreadOfInfluenceModifiedLpaM2
+        );
     }
 
     private static void createFolder(Path folder) {
