@@ -100,7 +100,7 @@ public class TweetsHandler {
             int totalNumOfFiles = files.size();
             int filesProcessed = 0;
 
-            System.out.println("Indexing Data on Lucene");
+            System.out.println("\nIndexing Data on Lucene");
             String oldMessage = "Processing files: 0.00% | Time Elapsed: 0m0s | Time Remaining: tbd";
             System.out.print(oldMessage);
             Instant start = Instant.now();
