@@ -6,6 +6,8 @@ src/main/resources/stream
 src/main/resources/Official_SBN-ITA-2016-Net.gz
 target/
 temporal_analysis/*.csv
+temporal_analysis/graphs/
+.*png
 spread_of_influence/*.csv
 identifying_yes_no_supporters/users*
 pom.xml.tag
