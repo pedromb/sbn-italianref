@@ -1,9 +1,13 @@
 
-*.ipynb
-.ipynb*
+
+.ipynb_checkpoints
 lucene_index/
-src/main/resources/
+src/main/resources/stream
+src/main/resources/Official_SBN-ITA-2016-Net.gz
 target/
+temporal_analysis/*.csv
+spread_of_influence/*.csv
+identifying_yes_no_supporters/users*
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
