@@ -1,4 +1,4 @@
-### Social and Behavioral Networks
+# Social and Behavioral Networks
 
 ## Italian Referendum 2016
 
