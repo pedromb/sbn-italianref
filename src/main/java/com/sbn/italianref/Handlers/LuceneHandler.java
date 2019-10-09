@@ -56,7 +56,6 @@ public class LuceneHandler {
     public static int indexTweets(Stream<JsonObject> tweets) {
         try {
             IndexWriter iw = openIndex();
-            ProcessText processor = new ProcessText();
             tweets.forEach((tweet) -> { addDocumentToIndex(iw, tweet); });
             iw.commit();
             iw.close();

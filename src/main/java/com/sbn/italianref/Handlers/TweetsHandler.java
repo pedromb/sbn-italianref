@@ -1,6 +1,7 @@
 package com.sbn.italianref.Handlers;
 
-import com.google.gson.*;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.sbn.italianref.Models.TweetModel;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexReader;
@@ -98,6 +99,8 @@ public class TweetsHandler {
                     .collect(Collectors.toList());
             int totalNumOfFiles = files.size();
             int filesProcessed = 0;
+
+            System.out.println("Indexing Data on Lucene");
             String oldMessage = "Processing files: 0.00% | Time Elapsed: 0m0s | Time Remaining: tbd";
             System.out.print(oldMessage);
             Instant start = Instant.now();
@@ -110,6 +113,7 @@ public class TweetsHandler {
                 oldMessage = this.progressPct(oldMessage, filesProcessed, totalNumOfFiles, duration);
                 if (this.limitTweets != 0 && numTweetsIndexed > this.limitTweets) break;
             }
+            System.out.println();
         } catch (Exception e) {
             e.printStackTrace();
         }

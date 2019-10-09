@@ -23,9 +23,6 @@ import it.stilo.g.util.NodesMapper;
 
 public class App {
 
-    private static String STREAM_RESOURCE = "stream";
-    private static String USERS_RESOURCE = "users.csv";
-    private static String LUCENE_INDEX = "lucene_index/";
     private static String TEMPORAL_ANALYSIS_FOLDER = "temporal_analysis/";
     private static String IDENTIFYING_YES_NO_SUPPORTERS_FOLDER = "identifying_yes_no_supporters/";
     private static String SPREAD_OF_INFLUENCE_FOLDER = "spread_of_influence/";
@@ -47,10 +44,6 @@ public class App {
     private static String SPREAD_OF_INFLUENCE_K_MODIFIED_LPA_CSV = SPREAD_OF_INFLUENCE_FOLDER + "spread_of_influence_modified_lpa_k.csv";
 
 
-
-    private static String USERS_GRAPH_RESOURCE = "Official_SBN-ITA-2016-Net.gz";
-    private static int TWEETS_LIMIT =   0;
-
     public static void main(String[] args) throws Exception {
         Path temporalAnalysisPath =  Paths.get(TEMPORAL_ANALYSIS_FOLDER);
         Path identifyingYesNoSupportersPath =  Paths.get(IDENTIFYING_YES_NO_SUPPORTERS_FOLDER);
@@ -61,10 +54,14 @@ public class App {
         createFolder(spreadOfInfluencePath);
 
         ResourcesHandler rh = new ResourcesHandler();
+        String STREAM_RESOURCE = "stream";
         Path streamPath = rh.getDirFromResources(STREAM_RESOURCE);
+        String USERS_RESOURCE = "users.csv";
         Path usersPath = rh.getDirFromResources(USERS_RESOURCE);
+        String USERS_GRAPH_RESOURCE = "Official_SBN-ITA-2016-Net.gz";
         Path usersGraphPath = rh.getDirFromResources(USERS_GRAPH_RESOURCE);
 
+        String LUCENE_INDEX = "lucene_index/";
         Path luceneIndexPath = Paths.get(LUCENE_INDEX);
         Path temporalAnalysisDistributionCsv = Paths.get(TEMPORAL_ANALYSIS_DISTRIBUTION_CSV);
         Path clustersCsv = Paths.get(CLUSTERS_CSV);
@@ -86,6 +83,7 @@ public class App {
         Path spreadOfInfluenceModifiedLpaK = Paths.get(SPREAD_OF_INFLUENCE_K_MODIFIED_LPA_CSV);
 
         LuceneHandler.luceneIndexPath = luceneIndexPath;
+        int TWEETS_LIMIT = 0;
         TweetsHandler tw = new TweetsHandler(streamPath, TWEETS_LIMIT);
         if(Files.notExists(luceneIndexPath)) {
             tw.indexTweetsToLucene();

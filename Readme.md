@@ -29,6 +29,7 @@ Under /src/main/resources include the following files:
 You can execute using maven, just go to the root folder of the project and run:
 
 ```
+mvn compile
 mvn exec:java
 
 ```
