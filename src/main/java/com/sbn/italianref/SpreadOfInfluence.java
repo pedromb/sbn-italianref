@@ -7,6 +7,7 @@ import it.stilo.g.structures.WeightedDirectedGraph;
 import it.stilo.g.util.NodesMapper;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,9 @@ public class SpreadOfInfluence {
         System.out.print("[Spread of Influence - LPA] Using M' starting...");
         lpa(graph, mapper, users, "M2", maxIterations, usersM2Path);
         System.out.println("DONE - File saved in "+usersM2Path.toString());
+        System.out.print("[Spread of Influence - LPA] Using K starting...");
+        lpa(graph, mapper, users, "K", maxIterations, usersKPath);
+        System.out.println("DONE - File saved in "+usersKPath.toString());
         System.out.println();
         System.out.println("Spread of Influence - LPA DONE!");
         System.out.println();
@@ -54,12 +58,15 @@ public class SpreadOfInfluence {
         System.out.print("[Spread of Influence - Modified LPA] Using M' starting...");
         kMeans(graph, mapper, users, "M2", maxIterations, usersM2Path);
         System.out.println("DONE - File saved in "+usersM2Path.toString());
+        System.out.print("[Spread of Influence - Modified LPA] Using K starting...");
+        kMeans(graph, mapper, users, "K", maxIterations, usersKPath);
+        System.out.println("DONE - File saved in "+usersKPath.toString());
         System.out.println();
         System.out.println("Spread of Influence - Modified LPA DONE!");
     }
 
 
-    public static void lpa(
+    private static void lpa(
             WeightedDirectedGraph graph,
             NodesMapper<String> mapper,
             List<UserModel> users,
@@ -98,7 +105,7 @@ public class SpreadOfInfluence {
         CSVHandler.write(filePath, fileRows);
     }
 
-    public static Map<Integer, String> runLpaIteration(WeightedDirectedGraph g, Map<Integer, String> clusters) {
+    private static Map<Integer, String> runLpaIteration(WeightedDirectedGraph g, Map<Integer, String> clusters) {
         List<Integer> nodes = clusters.keySet().stream().collect(Collectors.toList());
         Collections.shuffle(nodes);
         Map<Integer, String> newClusters = nodes
@@ -110,7 +117,7 @@ public class SpreadOfInfluence {
         return newClusters;
     }
 
-    public static String getNeighborsHighestFreqLabel(WeightedDirectedGraph g, Map<Integer, String> clusters, int node) {
+    private static String getNeighborsHighestFreqLabel(WeightedDirectedGraph g, Map<Integer, String> clusters, int node) {
         int neighborsFreq = 0;
         String label = getRandomLabel();
         int [] neighbors = g.out[node];
@@ -125,7 +132,7 @@ public class SpreadOfInfluence {
         return label;
     }
 
-    public static List<String[]> getNewRows(Map<Integer, String> clusters, int iteration) {
+    private static List<String[]> getNewRows(Map<Integer, String> clusters, int iteration) {
         List<String[]> newRows = new ArrayList<>();
         Map<String, Long> supportersState = clusters
                 .values()
@@ -144,57 +151,67 @@ public class SpreadOfInfluence {
         return newRows;
     }
 
-    public static String getRandomLabel() {
+    private static String getRandomLabel() {
         Random randomizer = new Random(System.currentTimeMillis());
         String [] labels = new String[] {"Yes", "No"};
         return labels[randomizer.nextInt(labels.length)];
     }
 
-    public static Map<Integer, String> getInitialClusters(
+    private static Map<Integer, String> getInitialClusters(
             List<UserModel> usersModel,
             NodesMapper<String> mapper,
             String initialSeed
     ) {
         Map<Integer, String> initialClusters = new HashMap<>();
+        List<String> usersYes = null;
+        List<String> usersNo = null;
         switch (initialSeed) {
             case "M":
-                initialClusters = usersModel
+                usersYes = usersModel
                         .stream()
-                        .collect(Collectors.toMap(
-                                x->mapper.getId(x.getUserId()),
-                                x->x.getSupport()
-                        ));
+                        .filter(x->x.getSupport().equals("Yes"))
+                        .map(x->x.getUserId())
+                        .collect(Collectors.toList());
+                usersNo = usersModel
+                        .stream()
+                        .filter(x->x.getSupport().equals("No"))
+                        .map(x->x.getUserId())
+                        .collect(Collectors.toList());
                 break;
             case "M2":
-                List<String> m2UsersYes = usersModel
+                usersYes = usersModel
                         .stream()
                         .filter(x->x.getSupport().equals("Yes"))
                         .sorted(Comparator.comparing(UserModel::getCentralityScore).reversed())
                         .limit(1000)
                         .map(x->x.getUserId())
                         .collect(Collectors.toList());
-                List<String> m2UsersNo = usersModel
+                usersNo = usersModel
                         .stream()
                         .filter(x->x.getSupport().equals("No"))
                         .sorted(Comparator.comparing(UserModel::getCentralityScore).reversed())
                         .limit(1000)
                         .map(x->x.getUserId())
                         .collect(Collectors.toList());
-                for(UserModel userModel : usersModel) {
-                    if(m2UsersYes.contains(userModel.getUserId()))
-                        initialClusters.put(mapper.getId(userModel.getUserId()), "Yes");
-                    else if(m2UsersNo.contains(userModel.getUserId()))
-                        initialClusters.put(mapper.getId(userModel.getUserId()), "No");
-                    else
-                        initialClusters.put(mapper.getId(userModel.getUserId()), "Neutral");
-                }
-
+                break;
+            case "K":
+                usersYes = getKUsers("yes", usersModel);
+                usersNo = getKUsers("no", usersModel);
+                break;
             default: break;
+        }
+        for(UserModel userModel : usersModel) {
+            if(usersYes.contains(userModel.getUserId()))
+                initialClusters.put(mapper.getId(userModel.getUserId()), "Yes");
+            else if(usersNo.contains(userModel.getUserId()))
+                initialClusters.put(mapper.getId(userModel.getUserId()), "No");
+            else
+                initialClusters.put(mapper.getId(userModel.getUserId()), "Neutral");
         }
         return initialClusters;
     }
 
-    public static void kMeans(
+    private static void kMeans(
             WeightedDirectedGraph graph,
             NodesMapper<String> mapper,
             List<UserModel> users,
@@ -236,7 +253,7 @@ public class SpreadOfInfluence {
         CSVHandler.write(filePath, fileRows);
     }
 
-    public static Map<Integer, String> runKMeansIteration(WeightedDirectedGraph g, Map<Integer, String> clusters, Map<String, Integer> centroids) {
+    private static Map<Integer, String> runKMeansIteration(WeightedDirectedGraph g, Map<Integer, String> clusters, Map<String, Integer> centroids) {
         Map<Integer, String> newClusters = new HashMap<>();
         for(int node : clusters.keySet()) {
             Map<String, Double> results = calculateScore(g, clusters, node, centroids.get(clusters.get(node)));
@@ -373,7 +390,7 @@ public class SpreadOfInfluence {
         return results;
     }
 
-    public static Map<String, Integer> getInitialCentroids(Map<Integer, String> clusters) {
+    private static Map<String, Integer> getInitialCentroids(Map<Integer, String> clusters) {
         Map<String, Integer> centroids = new HashMap<>();
         List<Integer> initialYes = clusters
                 .entrySet()
@@ -399,5 +416,26 @@ public class SpreadOfInfluence {
 
     }
 
+    private static List<String> getKUsers(String support, List<UserModel> usersModel) {
+        Path filePath = Paths.get("identifying_yes_no_supporters/kpp_score_"+support+".csv");
+        List<String[]> users = CSVHandler.read(filePath, true);
+        Map<String, Double> usersScore = new HashMap<>();
+        for(String[] row : users) {
+            usersScore.put(row[0], Double.valueOf(row[1]));
+        }
+        usersScore = usersScore
+                .entrySet()
+                .stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .limit(500)
+                .collect(Collectors.toMap(x->x.getKey(), x->x.getValue()));
+        Map<String, Double> finalUsersScore = usersScore;
+        List<String> usersId = usersModel
+                .stream()
+                .filter(x-> finalUsersScore.containsKey(x.getUserName()))
+                .map(x->x.getUserId())
+                .collect(Collectors.toList());
+        return usersId;
+    }
 
 }

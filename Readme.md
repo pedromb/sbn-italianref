@@ -34,13 +34,12 @@ mvn exec:java
 
 ```
 
-P.S.: The first execution might take awhile since it has to generate the Lucene index. The indexing process can take up to 30min to be finished. Running the program for a second time should be faster. Also, the result of running the KPP-NEG algorithm is included here so it doesnt have to be ran again, since this process can take more than 1 day.
+P.S.: The first execution might take awhile since it has to generate the Lucene index. The indexing process can take between 30 min and 1h (or more depending or your machine) to be finished. Running the program for a second time should be faster. Also, the result of running the KPP-NEG algorithm is included here so it doesnt have to be ran again, since this process can take more than 1 day.
 
 ### 4. Graphs on report
 
 The graphs on the report were generated using a Python script.
 You can find the IPython notebook for that on generate_graphs.ipynb
-
 
 ### 5. Files Generated
 
@@ -90,7 +89,6 @@ The following files are generated after executing:
 
 After running the generate_graphs script each folder will have the graphs used on the report under the figures folder. 
 
-
 ### 6. Report
 
-The report of the analysis with each step taken can be found under Report.pdf.
+The report of the analysis with each step taken can be found under [Report.pdf](https://github.com/pedromb/sbn-italianref/blob/master/Report.pdf).

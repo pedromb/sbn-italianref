@@ -163,7 +163,7 @@ public class SupportAnalysis {
     ) throws InterruptedException {
 
         System.out.println("[Identifying YES/NO Supporters - Part 4] Part 4 starting!");
-        WeightedDirectedGraph g = GraphHandler.subsetGraph(inducedGraph, 80 );
+        WeightedDirectedGraph g = GraphHandler.subsetGraph(inducedGraph, 50 );
         List<Integer> gVertexes = Arrays.stream(g.getVertex()).boxed().collect(Collectors.toList());
         List<UserModel> usersYes = users.stream().filter(x-> x.getSupport().equals("Yes")).collect(Collectors.toList());
         List<UserModel> usersNo = users.stream().filter(x-> x.getSupport().equals("No")).collect(Collectors.toList());
@@ -218,8 +218,6 @@ public class SupportAnalysis {
 
         System.out.println("[Identifying YES/NO Supporters - Part 4] Part 4 DONE!");
     }
-
-
 
     private static double  centralityScore(double normalizedSupportScore, double normalizedHubScore) {
         double metric = (2*normalizedHubScore + normalizedSupportScore) / 3;

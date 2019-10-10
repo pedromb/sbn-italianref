@@ -113,9 +113,15 @@ public class App {
         WeightedDirectedGraph inducedGraph = SupportAnalysis.centralityAnalysis(
                 usersModel, usersGraphPath, usersHitsYesCsv, usersHitsNoCsv, supportAnalysisGraphMapper
         );
-/*
-        SupportAnalysis.kppNeg(usersModel, inducedGraph, supportAnalysisGraphMapper, kppScoreYesCsv, kppScoresNoCsv);
-*/
+        if(Files.notExists(kppScoreYesCsv) && Files.notExists(kppScoresNoCsv)) {
+            SupportAnalysis.kppNeg(usersModel, inducedGraph, supportAnalysisGraphMapper, kppScoreYesCsv, kppScoresNoCsv);
+        }
+        else {
+            System.out.println("[Identifying YES/NO Supporters - Part 4] Files already founded on system. ");
+            System.out.println("[Identifying YES/NO Supporters - Part 4] Part 4 DONE!");
+            System.out.println();
+
+        }
         SpreadOfInfluence.runLpa(
                 inducedGraph, supportAnalysisGraphMapper, usersModel, 100,
                 spreadOfInfluenceLpaK, spreadOfInfluenceLpaM, spreadOfInfluenceLpaM2
