@@ -37,12 +37,7 @@ public class GraphHandler {
         for (List<String> combination : combinations) {
             graphNodes.put(combination, getCoocurrences(combination, tweetsTermsInverseIndex));
         }
-
-        double min = graphNodes.entrySet().stream().min(Comparator.comparing(Map.Entry::getValue)).get().getValue();
-        double max = graphNodes.entrySet().stream().max(Comparator.comparing(Map.Entry::getValue)).get().getValue();
-/*        graphNodes = graphNodes.entrySet().stream()
-                .collect(Collectors.toMap(x->x.getKey(), x-> normalize(x.getValue(), min, max)));*/
-
+        
         graphNodes = graphNodes
                 .entrySet()
                 .stream()
