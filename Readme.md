@@ -31,7 +31,6 @@ You can execute using maven, just go to the root folder of the project and run:
 ```
 mvn compile
 mvn exec:java
-
 ```
 
 P.S.: The first execution might take awhile since it has to generate the Lucene index. The indexing process can take between 30 min and 1h (or more depending or your machine) to be finished. Running the program for a second time should be faster. Also, the result of running the KPP-NEG algorithm is included here so it doesnt have to be ran again, since this process can take more than 1 day.
